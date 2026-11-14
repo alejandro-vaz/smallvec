@@ -21,7 +21,6 @@ mod macros;
 #[cfg(feature = "malloc-size-of")]
 mod mallocsizeof;
 mod newrange;
-mod proxy;
 mod rawsmallvec;
 mod references;
 #[cfg(feature = "rkyv")]
@@ -518,16 +517,15 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[track_caller]
-    pub fn splice<R, I>(
+    pub fn splice<Range: RangeBounds<usize>, Iterable: IntoIterator<Item = Item>>(
         &mut self,
-        range: R,
-        replace_with: I
-    ) -> Splice<'_, I::IntoIter, INLINE, Heap>
-    where
-        R: RangeBounds<usize>,
-        I: IntoIterator<Item = Item>
-    {
-        Splice::new(self.drain(range), replace_with.into_iter())
+        range: Range,
+        replacement: Iterable
+    ) -> Splice<'_, Iterable::IntoIter, INLINE, Heap> {
+        Splice {
+            drain: self.drain(range),
+            replacement: replacement.into_iter()
+        }
     }
 
     #[inline]
