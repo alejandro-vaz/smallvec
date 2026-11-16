@@ -1,10 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![cfg_attr(feature = "deref-pure", feature(deref_pure_trait))]
-#![cfg_attr(feature = "specialization", allow(incomplete_features))]
-#![cfg_attr(feature = "specialization", feature(specialization, trusted_len))]
-#![cfg_attr(feature = "may-dangle", feature(dropck_eyepatch))]
+#![cfg_attr(feature = "nightly", feature(deref_pure_trait, dropck_eyepatch))]
 
 extern crate alloc;
 #[cfg(feature = "std")]
@@ -27,8 +24,6 @@ mod references;
 mod rkyv;
 #[cfg(feature = "serde")]
 mod serde;
-#[cfg(feature = "specialization")]
-mod specialization;
 #[cfg(feature = "zerocopy")]
 mod zerocopy;
 
@@ -70,16 +65,8 @@ use proptest::{
         Strategy
     }
 };
-#[cfg(any(feature = "internals", feature = "may-dangle"))]
+#[cfg(any(feature = "internals", feature = "nightly"))]
 use smallvec_macro::syntax;
-#[cfg(feature = "specialization")]
-use specialization::{
-    SpecCloneFrom,
-    SpecExtend,
-    SpecExtendFromWithin,
-    SpecFromElem,
-    SpecFromIterator
-};
 #[cfg(feature = "std")]
 use std::io::{
     Result as IoResult,
@@ -279,7 +266,6 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
         buf: [MaybeUninit<Item>; INLINE],
         length: usize
     ) -> Self {
-        debug_assert!(length <= INLINE);
         Self {
             length: LocatedLength::new(length, false),
             raw: RawSmallVec {
@@ -349,7 +335,6 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     /// range `..self.length` must be initialized.
     #[inline]
     pub unsafe fn set_len(&mut self, new_len: usize) {
-        debug_assert!(new_len <= self.capacity());
         self.length = LocatedLength::new(new_len, self.length.is_spilled());
     }
 
@@ -538,7 +523,6 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         if length == self.capacity() {
             self.reserve(1);
         }
-        debug_assert!(length < self.capacity());
 
         // SAFETY: `length < capacity` after the reserve,
         //         so the offset stays in bounds of the allocation.
@@ -900,7 +884,6 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
             assert_failed(index, length);
         }
         self.reserve(1);
-        debug_assert!(length < self.capacity());
 
         // SAFETY: `index <= length <= capacity`,
         //         so the offset stays in bounds of the allocation.
@@ -1334,15 +1317,7 @@ impl<Item: Clone, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, H
         // enough. The range is within bounds through the use of
         // `core::slice::range`.
         unsafe {
-            #[cfg(feature = "specialization")]
-            {
-                <Self as SpecExtendFromWithin<Item>>::spec_extend_from_within(self, source);
-            }
-
-            #[cfg(not(feature = "specialization"))]
-            {
-                self.extend_from_within_fallback(source);
-            }
+            self.extend_from_within_fallback(source);
         }
     }
 }
@@ -1430,9 +1405,9 @@ impl<Heap: Allocator> Drop for DropDealloc<'_, Heap> {
     }
 }
 
-#[cfg_attr(feature = "may-dangle", syntax(unsafe))]
-impl<#[cfg_attr(feature = "may-dangle", may_dangle)] Item, const INLINE: usize, Heap: Allocator>
-    Drop for SmallVec<Item, INLINE, Heap>
+#[cfg_attr(feature = "nightly", syntax(unsafe))]
+impl<#[cfg_attr(feature = "nightly", may_dangle)] Item, const INLINE: usize, Heap: Allocator> Drop
+    for SmallVec<Item, INLINE, Heap>
 {
     fn drop(&mut self) {
         let (length, spilled) = self.length.parts();
@@ -1468,21 +1443,7 @@ pub fn from_elem<Item: Clone, const INLINE: usize>(
         // Standard Rust vectors are already specialized.
         vec![elem; n].into()
     } else {
-        #[cfg(feature = "specialization")]
-        {
-            // SAFETY: The precondition is checked in the initial comparison
-            // above.
-            unsafe {
-                <SmallVec<Item, INLINE, Global> as SpecFromElem<Item>>::spec_from_elem(elem, n)
-            }
-        }
-
-        #[cfg(not(feature = "specialization"))]
-        {
-            // SAFETY: The precondition is checked in the initial comparison
-            // above.
-            unsafe { SmallVec::<Item, INLINE>::from_elem_fallback(elem, n) }
-        }
+        unsafe { SmallVec::<Item, INLINE>::from_elem_fallback(elem, n) }
     }
 }
 
@@ -1671,32 +1632,12 @@ impl<Item: Clone, const INLINE: usize, Heap: Allocator + Clone> Clone
     }
 
     #[inline]
-    fn clone_from(&mut self, source: &Self) {
-        #[cfg(feature = "specialization")]
-        {
-            <Self as SpecCloneFrom<Item>>::spec_clone_from(self, source);
-        }
-
-        #[cfg(not(feature = "specialization"))]
-        {
-            self.clone_from_fallback(source);
-        }
-    }
+    fn clone_from(&mut self, source: &Self) { self.clone_from_fallback(source); }
 }
 
 impl<Item, const INLINE: usize, Heap: Allocator> Extend<Item> for SmallVec<Item, INLINE, Heap> {
     #[inline]
-    fn extend<I: IntoIterator<Item = Item>>(&mut self, iter: I) {
-        #[cfg(feature = "specialization")]
-        {
-            SpecExtend::<Item, _>::spec_extend(self, iter.into_iter());
-        }
-
-        #[cfg(not(feature = "specialization"))]
-        {
-            self.extend_fallback(iter);
-        }
-    }
+    fn extend<I: IntoIterator<Item = Item>>(&mut self, iter: I) { self.extend_fallback(iter); }
 }
 
 impl<'valid, Item: Clone + 'valid, const INLINE: usize, Heap: Allocator> Extend<&'valid Item>
@@ -1704,30 +1645,14 @@ impl<'valid, Item: Clone + 'valid, const INLINE: usize, Heap: Allocator> Extend<
 {
     #[inline]
     fn extend<I: IntoIterator<Item = &'valid Item>>(&mut self, iter: I) {
-        #[cfg(feature = "specialization")]
-        {
-            SpecExtend::<&'valid Item, _>::spec_extend(self, iter.into_iter());
-        }
-
-        #[cfg(not(feature = "specialization"))]
-        {
-            self.extend_fallback(iter.into_iter().cloned());
-        }
+        self.extend_fallback(iter.into_iter().cloned());
     }
 }
 
 impl<Item, const INLINE: usize> FromIterator<Item> for SmallVec<Item, INLINE, Global> {
     #[inline]
     fn from_iter<I: IntoIterator<Item = Item>>(iter: I) -> Self {
-        #[cfg(feature = "specialization")]
-        {
-            SpecFromIterator::<Item, _>::spec_from_iter(iter.into_iter())
-        }
-
-        #[cfg(not(feature = "specialization"))]
-        {
-            Self::from_iter_fallback(iter.into_iter())
-        }
+        Self::from_iter_fallback(iter.into_iter())
     }
 }
 
