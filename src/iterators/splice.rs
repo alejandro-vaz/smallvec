@@ -77,8 +77,10 @@ impl<Iterable: Iterator, const INLINE: usize, Heap: Allocator> Drop
         smallvec.extend(&mut self.replacement);
         let mut collected = smallvec.into_iter();
         if collected.len() > 0 {
-            unsafe { self.drain.move_tail(collected.len()) };
-            unsafe { self.drain.fill(&mut collected) };
+            unsafe {
+                self.drain.move_tail(collected.len());
+                self.drain.fill(&mut collected);
+            }
         }
     }
 }
