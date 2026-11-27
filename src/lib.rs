@@ -66,6 +66,8 @@ use defmt::{
 #[cfg(feature = "encase")]
 use encase::impl_rts_array;
 pub use error::SmallVecError;
+#[cfg(feature = "internals")]
+pub use iterators::intoiter::IntoIter;
 #[cfg(feature = "proptest")]
 use proptest::{
     arbitrary::Arbitrary as Proptest,
@@ -144,8 +146,6 @@ use {
     },
     range::range
 };
-#[cfg(feature = "internals")]
-pub use iterators::intoiter::IntoIter;
 #[cfg_attr(feature = "internals", prepend(pub))]
 use {
     iterators::{
