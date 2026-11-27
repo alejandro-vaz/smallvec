@@ -18,7 +18,6 @@ use {
     }
 };
 
-#[repr(transparent)]
 pub struct Visitor<Item, const INLINE: usize>(pub PhantomData<Item>);
 
 impl<'valid, Item: Deserialize<'valid>, const INLINE: usize> DeVisitor<'valid>
