@@ -144,12 +144,13 @@ use {
     },
     range::range
 };
+#[cfg(feature = "internals")]
+pub use iterators::intoiter::IntoIter;
 #[cfg_attr(feature = "internals", prepend(pub))]
 use {
     iterators::{
         drain::Drain,
         extractif::ExtractIf,
-        intoiter::IntoIter,
         splice::Splice
     },
     locatedlength::LocatedLength,
