@@ -89,4 +89,3 @@ v.sort();
 ## Sponsors
 
 - [![Servo Browser](https://servo.org/svg/servo-color-positive-no-container.svg)](https://servo.org)
-- private sponsor
