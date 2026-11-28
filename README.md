@@ -84,7 +84,7 @@ v.sort();
 > [!NOTE]
 >
 > - SmallVec without any features enabled does not make use of the standard library.
-> - The `rayon`, `proptest` and `schemars` features implicitly require `std`.
+> - The `rayon` and `proptest` features implicitly require `std`.
 
 ## Sponsors
 
